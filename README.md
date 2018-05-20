@@ -58,7 +58,7 @@ Search the NPM registry. Use the order numbers returned with this method in the 
 
 - `query`: The NPM package name
 - `filters`: An object of filters as specified by the [NPMS API](https://api-docs.npms.io/#api-Search-ExecuteSearchQuery)
-	Default: `{}`
+	- Default: `{}`
 
 #### Example
 
