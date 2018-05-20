@@ -17,6 +17,18 @@ WNPM isn't anywhere close to providing the feature set of `npm` or real package 
 - Packages need to be on GitHub
 - Packages need to have a `unpkg` or `main` field specified which can run in a browser standalone
 
+## Install
+
+The best way to install and use WNPM is as a bookmarklet or a user script. Create a new bookmarklet and replace the URL with
+
+```
+javascript:(function(){const a=window.wnpm;if('object'!=typeof a||null===a){const b=document.createElement('SCRIPT');b.type='text/javascript',b.src='https://gitcdn.link/repo/andrewbridge/wnpm/master/wnpm.min.js',b.addEventListener('error',()=>alert('An error occurred loading the bookmarklet'),!1),document.head.appendChild(b)}})();
+```
+
+Or copy and paste the contents of `bookmarklet.js` or `bookmarklet.min.js` into a user script manager.
+
+It hopefully doesn't need to be said, but this should definitely not be used as part of any production project.
+
 ## Usage
 
 ### `wnpm.get(string query, object opts)`

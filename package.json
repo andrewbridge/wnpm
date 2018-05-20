@@ -2,7 +2,7 @@
   "name": "wnpm",
   "version": "1.0.0",
   "description": "A simplistic NPM package loader and interface for the browser",
-  "main": "wnpm.js",
+  "main": "wnpm.min.js",
   "repository": "https://github.com/andrewbridge/wnpm",
   "author": "Andrew Bridge <andrew@andrewhbridge.co.uk>",
   "license": "MIT",
