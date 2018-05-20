@@ -38,7 +38,7 @@ Load an NPM package into the browser.
 - `query`: The NPM package name
 - `opts`: An object of options
 	- `npmFilters`: An object of filters as specified by the [NPMS API](https://api-docs.npms.io/#api-Search-ExecuteSearchQuery)
-		Default: `{not: ['deprecated','insecure','unstable']}`
+		- Default: `{not: ['deprecated','insecure','unstable']}`
 	- `forcePackage`: An integer corresponding to the package order returned when using `wnpm.search` with the same `query`.
 
 #### Example
