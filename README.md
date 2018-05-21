@@ -33,7 +33,7 @@ It hopefully doesn't need to be said, but this should definitely not be used as 
 
 ### `wnpm.get(string query, object opts)`
 
-Load an NPM package into the browser.
+Load an NPM package into the browser. Returns a Promise which will resolve on load completion of reject if the load aborts at any point.
 
 - `query`: The NPM package name
 - `opts`: An object of options
@@ -52,9 +52,26 @@ wnpm.get('some-new-gulp-plugin', {npmFilters: {is: ['unstable'], keywords: 'gulp
 wnpm.get('vue-js', {forcePackage: 3})
 ```
 
+### `wnpm.getAll(array queries, object opts)`
+
+Load multiple NPM packages into the browser. Returns a Promise of each call to `wnpm.get`. Rejecting in the same way as `wnpm.get`.
+
+- `queries`: An array of  NPM package names.
+- `opts`: An object of options that will be used by both package loads.
+	- `npmFilters`: An object of filters as specified by the [NPMS API](https://api-docs.npms.io/#api-Search-ExecuteSearchQuery)
+		- Default: `{not: ['deprecated','insecure','unstable']}`
+	- `forcePackage`: An integer corresponding to the package order returned when using `wnpm.search` with the same `query`.
+
+#### Example
+
+```js
+// Standard usage
+wnpm.get(['vue', 'vuex']);
+```
+
 ### `wnpm.search(string query, object filters)`
 
-Search the NPM registry. Use the order numbers returned with this method in the `forcePackage` option of `wnpm.get`
+Search the NPM registry. Use the order numbers returned with this method in the `forcePackage` option of `wnpm.get`. Returns a Promise which will resolve when the search has completed with the JSON response of the [NPMS API](https://api-docs.npms.io/). Rejects if the API call fails.
 
 - `query`: The NPM package name
 - `filters`: An object of filters as specified by the [NPMS API](https://api-docs.npms.io/#api-Search-ExecuteSearchQuery)
@@ -73,7 +90,7 @@ wnpm.search('datepicker', {not: ['deprecated', 'insecure', 'unstable'], keywords
 
 ### `wnpm.load(string scriptUrl)`
 
-Promise based script loader. Appends a script tag to `document.body`.
+Promise based script loader. Appends a script tag to `document.body`. Returns a promise which resolves if the script loads successfully or rejects otherwise.
 
 - `scriptUrl`: The URL of the script to be loaded.
 

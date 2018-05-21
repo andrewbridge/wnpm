@@ -128,28 +128,34 @@
 			});
 		}
 
-		static async search(query = '', filters = {}) {
-			let json;
-			try {
-				json = await search(query, filters);
-			} catch(e) {
-				console.error('Error searching NPM registry');
-				return;
-			}
-
-			console.groupCollapsed(`${json.total} found for ${query}`);
-			json.results.forEach((result, index) => {
-				console.groupCollapsed(`${index + 1}. ${result.package.name}`);
-				console.log(`Result score: ${parseInt(result.score.final * 100)}%`);
-				console.log(result.package.description);
-				if (result.searchScore < 100) {
-					console.log('%cThis package would not be selected automatically with wnpm.get', 'color: red');
-				} else {
-					console.log('%cThis package could be selected automatically with wnpm.get', 'color: green');
+		static search(query = '', filters = {}) {
+			return new Promise(async (resolve, reject) => {
+				let json;
+				try {
+					json = await search(query, filters);
+				} catch(e) {
+					const msg = 'Error searching NPM registry';
+					console.error(msg);
+					reject({msg, details: e});
+					return;
 				}
+
+				console.groupCollapsed(`${json.total} found for ${query}`);
+				json.results.forEach((result, index) => {
+					console.groupCollapsed(`${index + 1}. ${result.package.name}`);
+					console.log(`Result score: ${parseInt(result.score.final * 100)}%`);
+					console.log(result.package.description);
+					if (result.searchScore < 100) {
+						console.log('%cThis package would not be selected automatically with wnpm.get', 'color: red');
+					} else {
+						console.log('%cThis package could be selected automatically with wnpm.get', 'color: green');
+					}
+					console.groupEnd();
+				});
 				console.groupEnd();
+
+				resolve(json);
 			});
-			console.groupEnd();
 		}
 	}
 
