@@ -4,6 +4,7 @@
 	const NPM_URL = 'https://api.npms.io/v2/search';
 	const GITHUB_URL = 'https://api.github.com/repos';
 	const GITCDN_URL = 'https://gitcdn.link/repo';
+	const UNPKG_URL = 'https://unpkg.com';
 
 	function jsonFetch() {
 		return new Promise((resolve, reject) => {
@@ -21,8 +22,74 @@
 		return jsonFetch(`${NPM_URL}?q=${query}`);
 	}
 
+	function getCdnUrl(npmPackage, cdnProvider) {
+		return new Promise(async (resolve, reject) => {
+			switch(cdnProvider) {
+				case 'github':
+					try {
+						resolve(getGitHubCdnUrl(npmPackage));
+					} catch(e) {
+						reject(e);
+					}
+					break;
+				case 'unpkg':
+					resolve(getPackageCdn(npmPackage, UNPKG_URL));
+					break;
+			}
+		});
+	}
+
+	async function getGitHubCdnUrl(npmPackage) {
+		if (npmPackage.links.repository.match(/github\.com/) === null) {
+			const msg = `${npmPackage.name} does not use github as it's repository. Found ${npmPackage.links.respository}`;
+			console.error(msg);
+			throw new Error({msg, details: npmPackage});
+		}
+
+		console.log(`Loading via GitHub using ${npmPackage.links.respository}`);
+		const repoPath = npmPackage.links.repository.replace(/(^.*github\.com\/|\/$)/g, '');
+
+		// NPM likes semver parsable versions, so there often isn't a leading 'v'. GitHub suggests using the v.
+		let tags;
+		try {
+			tags = await jsonFetch(`${GITHUB_URL}/${repoPath}/tags`);
+			if (tags.length === 0) {
+				throw tags;
+			}
+		} catch (e) {
+			const msg = `No tags found for ${npmPackage.name}'s listed repo. Unable to pull stable release. Aborting`;
+			console.error(msg);
+			throw new Error({msg, details: e});
+			return;
+		}
+
+		const tag = tags.find(tag => tag.name === npmPackage.version || tag.name === `v${npmPackage.version}`);
+
+		let releaseTag;
+		if (typeof tag === 'undefined') {
+			// Neither version tag looks usable. Let's grab the latest release for the repo from the GitHub API
+			releaseTag = tags[0].name;
+			console.warn(`Unable to find a suitable repo tag for version ${npmPackage.version}. Using the latest tag (${releaseTag}) instead.`);
+		} else {
+			releaseTag = tag.name;
+		}
+
+		return `${GITCDN_URL}/${repoPath}/${releaseTag}`;
+	}
+
+	function getPackageCdn(npmPackage, cdnUrl) {
+		return `${cdnUrl}/${npmPackage.name}@${npmPackage.version}`;
+	}
+
 	class WNPM {
-		static get(query, opts = {npmFilters: {not: ['deprecated','insecure','unstable']}}) {
+		static get(query, opts) {
+			const defaultOpts = {
+				npmFilters: {
+					not: ['deprecated','insecure','unstable']
+				}, 
+				cdnProviders: ['unpkg','github']
+			};
+			opts = Object.assign({}, defaultOpts, opts);
 			return new Promise(async (resolve, reject) => {
 				let npmResults;
 				try {
@@ -51,51 +118,35 @@
 
 				const packageIndex = opts.forcePackage - 1 || 0;
 				const npmPackage = npmResults.results[packageIndex].package;
+				console.log(`Found ${query} as ${npmPackage.name} at ${npmPackage.version}; using ${npmPackage.links.repository}`);
 
-				if (npmPackage.links.repository.match(/github\.com/) === null) {
-					const msg = `${npmPackage.name} does not use github as it's repository. Found ${npmPackage.links.respository}`;
+				let baseUrl, providerFound = false;
+				for (let provider of opts.cdnProviders) {
+					try {
+						baseUrl = await getCdnUrl(npmPackage, provider);
+						providerFound = true;
+						break;
+					} catch(e) {
+						console.warn(`Could not generate a CDN URL for ${provider}`);
+					}
+				}
+
+				if (!providerFound) {
+					const msg = `Couldn't generate a CDN URL for any provider`;
 					console.error(msg);
 					reject({msg, details: npmPackage});
 					return;
 				}
 
-				console.log(`Found ${query} as ${npmPackage.name} at ${npmPackage.version}; using ${npmPackage.links.repository}`);
-				const repoPath = npmPackage.links.repository.replace(/(^.*github\.com\/|\/$)/g, '');
-
-				// NPM likes semver parsable versions, so there often isn't a leading 'v'. GitHub suggests using the v.
-				let tags;
-				try {
-					tags = await jsonFetch(`${GITHUB_URL}/${repoPath}/tags`);
-					if (tags.length === 0) {
-						throw tags;
-					}
-				} catch (e) {
-					const msg = `No tags found for ${npmPackage.name}'s listed repo. Unable to pull stable release. Aborting`;
-					console.error(msg);
-					reject({msg, details: e});
-					return;
-				}
-
-				const tag = tags.find(tag => tag.name === npmPackage.version || tag.name === `v${npmPackage.version}`);
-
-				let releaseTag;
-				if (typeof tag === 'undefined') {
-					// Neither version tag looks usable. Let's grab the latest release for the repo from the GitHub API
-					releaseTag = tags[0].name;
-					console.warn(`Unable to find a suitable repo tag for version ${npmPackage.version}. Using the latest tag (${releaseTag}) instead.`);
-				} else {
-					releaseTag = tag.name;
-				}
-
 				let mainFile;
 				try {
-					const packageJSON = await jsonFetch(`${GITCDN_URL}/${repoPath}/${releaseTag}/package.json`);
+					const packageJSON = await jsonFetch(`${baseUrl}/package.json`);
 					console.log(`package.json retrieved`);
 					if (packageJSON.dependencies instanceof Array && packageJSON.dependencies.length > 0) {
 						console.log(`This package appears to have dependencies. You may have issues running this package.`);
 					}
 					mainFile = packageJSON.unpkg || packageJSON.main;
-					console.log(`Loading package main file: ${mainFile}`);
+					console.log(`Loading package ${packageJSON.unpkg ? 'unpkg' : 'main'} file: ${mainFile}`);
 				} catch(e) {
 					const msg = `Error retrieving package.json for ${npmPackage.name}. Status: ${e.status}`;
 					console.error(msg);
@@ -103,7 +154,7 @@
 				}
 
 				try {
-					await WNPM.load(`${GITCDN_URL}/${repoPath}/${releaseTag}/${mainFile}`);
+					await WNPM.load(`${baseUrl}/${mainFile}`);
 					console.log(`${npmPackage.name} loaded!`);
 					resolve(npmPackage);
 				} catch (e) {

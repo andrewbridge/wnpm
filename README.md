@@ -1,7 +1,7 @@
 # WNPM
 > A simplistic NPM package loader and interface for the browser
 
-WNPM allows NPM packages which are usable in a browser and pre-built in their repo to be loaded into the browser. It does this by stringing together other far cleverer services such as [npms.io](https://npms.io/), [the GitHub API](https://developer.github.com/) and [GitCDN](https://gitcdn.link/).
+WNPM allows NPM packages which are usable in a browser and pre-built in their repo to be loaded into the browser. It does this by stringing together other far cleverer services such as [npms.io](https://npms.io/), [the GitHub API](https://developer.github.com/), [GitCDN](https://gitcdn.link/), and [UNPKG](https://unpkg.com).
 
 ## Why?
 
@@ -13,8 +13,7 @@ Given that I was already making use of [npms.io](https://npms.io), to ability to
 
 WNPM isn't anywhere close to providing the feature set of `npm` or real package managers.
 
-- Packages with dependencies won't have those depedencies loaded (no need and GitHub's rate limits would get in the way)
-- Packages need to be on GitHub
+- Packages with dependencies won't have those depedencies loaded (for a variety of reasons)
 - Packages need to have a `unpkg` or `main` field specified which can run in a browser standalone
 
 ## Install
@@ -40,6 +39,8 @@ Load an NPM package into the browser. Returns a Promise which will resolve on lo
 	- `npmFilters`: An object of filters as specified by the [NPMS API](https://api-docs.npms.io/#api-Search-ExecuteSearchQuery)
 		- Default: `{not: ['deprecated','insecure','unstable']}`
 	- `forcePackage`: An integer corresponding to the package order returned when using `wnpm.search` with the same `query`.
+	- `cdnProviders`: An order of CDN providers that should be used to retrieve files.
+		- Default: `['unpkg','github']`
 
 #### Example
 
@@ -50,6 +51,8 @@ wnpm.get('lodash');
 wnpm.get('some-new-gulp-plugin', {npmFilters: {is: ['unstable'], keywords: 'gulpplugin'}});
 // The weirdest possible way of installing Vuex (as it's the 3rd NPM result when searching 'vue-js')
 wnpm.get('vue-js', {forcePackage: 3})
+// Force files to be retrieved from the GitHub repo for the package
+wnpm.get('vuex', {cdnProviders: ['github']});
 ```
 
 ### `wnpm.getAll(array queries, object opts)`
@@ -61,6 +64,8 @@ Load multiple NPM packages into the browser. Returns a Promise of each call to `
 	- `npmFilters`: An object of filters as specified by the [NPMS API](https://api-docs.npms.io/#api-Search-ExecuteSearchQuery)
 		- Default: `{not: ['deprecated','insecure','unstable']}`
 	- `forcePackage`: An integer corresponding to the package order returned when using `wnpm.search` with the same `query`.
+	- `cdnProviders`: An order of CDN providers that should be used to retrieve files.
+		- Default: `['unpkg','github']`
 
 #### Example
 
