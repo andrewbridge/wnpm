@@ -14,7 +14,7 @@ Given that I was already making use of [npms.io](https://npms.io), to ability to
 WNPM isn't anywhere close to providing the feature set of `npm` or real package managers.
 
 - Packages with dependencies won't have those depedencies loaded (for a variety of reasons)
-- Packages need to have a `unpkg` or `main` field specified which can run in a browser standalone
+- Packages need to have a `unpkg`, `browser` or `main` field specified which can run in a browser standalone
 
 ## Install
 
