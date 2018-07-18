@@ -138,15 +138,22 @@
 					return;
 				}
 
-				let mainFile;
+				let mainFile, mainFileName;
 				try {
 					const packageJSON = await jsonFetch(`${baseUrl}/package.json`);
 					console.log(`package.json retrieved`);
 					if (packageJSON.dependencies instanceof Array && packageJSON.dependencies.length > 0) {
 						console.log(`This package appears to have dependencies. You may have issues running this package.`);
 					}
-					mainFile = packageJSON.unpkg || packageJSON.main;
-					console.log(`Loading package ${packageJSON.unpkg ? 'unpkg' : 'main'} file: ${mainFile}`);
+					if ('unpkg' in packageJSON) {
+						mainFileName = 'unpkg';
+					} else if ('browser' in packageJSON) {
+						mainFileName = 'browser';
+					} else {
+						mainFileName = 'main';
+					}
+					mainFile = packageJSON[mainFileName];
+					console.log(`Loading package ${mainFileName} file: ${mainFile}`);
 				} catch(e) {
 					const msg = `Error retrieving package.json for ${npmPackage.name}. Status: ${e.status}`;
 					console.error(msg);
