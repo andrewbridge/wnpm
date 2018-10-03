@@ -145,14 +145,14 @@
 					if (packageJSON.dependencies instanceof Array && packageJSON.dependencies.length > 0) {
 						console.log(`This package appears to have dependencies. You may have issues running this package.`);
 					}
-					if ('unpkg' in packageJSON) {
+					if ('unpkg' in packageJSON && typeof packageJSON.unpkg === 'string') {
 						mainFileName = 'unpkg';
-					} else if ('browser' in packageJSON) {
+					} else if ('browser' in packageJSON && typeof packageJSON.browser === 'string') {
 						mainFileName = 'browser';
 					} else {
 						mainFileName = 'main';
 					}
-					mainFile = packageJSON[mainFileName];
+					mainFile = packageJSON[mainFileName] || 'index.js';
 					console.log(`Loading package ${mainFileName} file: ${mainFile}`);
 				} catch(e) {
 					const msg = `Error retrieving package.json for ${npmPackage.name}. Status: ${e.status}`;
