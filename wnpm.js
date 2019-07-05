@@ -3,7 +3,7 @@
 
 	const NPM_URL = 'https://api.npms.io/v2/search';
 	const GITHUB_URL = 'https://api.github.com/repos';
-	const GITCDN_URL = 'https://gitcdn.link/repo';
+	const JSDELIVR_URL = 'https://cdn.jsdelivr.net/gh/';
 	const UNPKG_URL = 'https://unpkg.com';
 
 	function jsonFetch() {
@@ -74,7 +74,7 @@
 			releaseTag = tag.name;
 		}
 
-		return `${GITCDN_URL}/${repoPath}/${releaseTag}`;
+		return `${JSDELIVR_URL}/${repoPath}/${releaseTag}`;
 	}
 
 	function getPackageCdn(npmPackage, cdnUrl) {
@@ -89,11 +89,11 @@
 				}, 
 				cdnProviders: ['unpkg','github']
 			};
-			opts = Object.assign({}, defaultOpts, opts);
+			const { npmFilters, forcePackage, cdnProviders, filePath } = Object.assign({}, defaultOpts, opts);
 			return new Promise(async (resolve, reject) => {
 				let npmResults;
 				try {
-					npmResults = await search(query, opts.npmFilters);
+					npmResults = await search(query, npmFilters);
 				} catch(e) {
 					const msg = 'Error searching NPM registry.';
 					console.error(msg);
@@ -108,7 +108,7 @@
 					return;
 				}
 
-				if (parseInt(npmResults.results[0].searchScore) < 100 && !('forcePackage' in opts)) {
+				if (parseInt(npmResults.results[0].searchScore) < 100 && !forcePackage) {
 					const msg = `Couldn't find an exact match for ${query}.\n\n` +
 					`Use wnpm.search to determine the correct package name or use the 'forcePackage' option with wnpm.get`;
 					console.error(msg);
@@ -116,12 +116,12 @@
 					return;
 				}
 
-				const packageIndex = opts.forcePackage - 1 || 0;
+				const packageIndex = forcePackage - 1 || 0;
 				const npmPackage = npmResults.results[packageIndex].package;
 				console.log(`Found ${query} as ${npmPackage.name} at ${npmPackage.version}; using ${npmPackage.links.repository}`);
 
 				let baseUrl, providerFound = false;
-				for (let provider of opts.cdnProviders) {
+				for (let provider of cdnProviders) {
 					try {
 						baseUrl = await getCdnUrl(npmPackage, provider);
 						providerFound = true;
@@ -152,7 +152,7 @@
 					} else {
 						mainFileName = 'main';
 					}
-					mainFile = packageJSON[mainFileName] || 'index.js';
+					mainFile = filePath || packageJSON[mainFileName] || 'index.js';
 					console.log(`Loading package ${mainFileName} file: ${mainFile}`);
 				} catch(e) {
 					const msg = `Error retrieving package.json for ${npmPackage.name}. Status: ${e.status}`;
