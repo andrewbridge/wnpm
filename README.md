@@ -21,7 +21,7 @@ WNPM isn't anywhere close to providing the feature set of `npm` or real package 
 The best way to install and use WNPM is as a bookmarklet or a user script. Create a new bookmarklet and replace the URL with
 
 ```
-javascript:(function(){const a=window.wnpm;if("object"!=typeof a||null===a){const a=document.createElement("SCRIPT");a.type="text/javascript",a.src="https://cdn.jsdelivr.net/gh/andrewbridge/wnpm@latest/wnpm.min.js",a.addEventListener("error",()=>alert("An error occurred loading the bookmarklet"),!1),document.head.appendChild(a)}})();
+javascript:!function(){var e=window.wnpm;if("object"!=typeof e||null===e){const t=document.createElement("SCRIPT");t.type="text/javascript",t.src="https://cdn.jsdelivr.net/gh/andrewbridge/wnpm@latest/wnpm.min.js",t.addEventListener("error",()=>alert("An error occurred loading the bookmarklet"),!1),document.head.appendChild(t)}}();
 ```
 
 Or copy and paste the contents of `bookmarklet.js` or `bookmarklet.min.js` into a user script manager.
