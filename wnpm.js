@@ -1,6 +1,6 @@
 import { version } from './package.json';
 
-const NPM_URL = 'https://api.npms.io/v2/search';
+const NPM_URL = 'https://registry.npmjs.org/-/v1/search';
 const GITHUB_URL = 'https://api.github.com/repos';
 const JSDELIVR_URL = 'https://cdn.jsdelivr.net/gh/';
 const UNPKG_URL = 'https://unpkg.com';
@@ -61,102 +61,107 @@ const getCdnUrl = async (npmPackage, cdnProvider) => {
 const search = (query, filters) => {
 	if (typeof filters === 'object') {
 		for (let filter in filters) {
-			const content = filters[filter];
-			query += `+${filter}:${content instanceof Array ? content.join(',') : content}`;
+			const specifier = filters[filter];
+			if (Array.isArray(specifier)) {
+				specifier.forEach(value => query += ` ${filter}:${value}`);
+				continue;
+			}
+			query += ` ${filter}:${specifier}`;
 		}
 	}
-	return jsonFetch(`${NPM_URL}?q=${query}`);
+	return jsonFetch(`${NPM_URL}?text=${encodeURIComponent(query)}`);
+}
+
+class WNPMError extends Error {
+	constructor(message, details) {
+		super(message);
+		this.details = details;
+	}
 }
 
 class WNPM {
 	static async get(query, opts) {
 		const defaultOpts = {
-			npmFilters: {
+			filters: {
 				not: ['deprecated','insecure','unstable']
 			},
 			cdnProviders: ['unpkg','github']
 		};
-		const { npmFilters, forcePackage, cdnProviders, filePath } = Object.assign({}, defaultOpts, opts);
-		return new Promise(async (resolve, reject) => {
-			let npmResults;
+		const { filters, forcePackage, cdnProviders, filePath } = Object.assign({}, defaultOpts, opts);
+		let npmResults;
+		try {
+			npmResults = await search(query, filters);
+		} catch(e) {
+			const msg = 'Error searching NPM registry.';
+			console.error(msg);
+			throw new WNPMError(msg, e);
+		}
+
+		if (npmResults.total === 0) {
+			const msg = `No results found for ${query}.`;
+			console.error(msg);
+			throw new WNPMError(msg, npmResults);
+		}
+
+		if (parseInt(npmResults.objects[0].searchScore) < 100 && !forcePackage) {
+			const msg = `Couldn't find an exact match for ${query}.\n\n` +
+			`Use wnpm.search to determine the correct package name or use the 'forcePackage' option with wnpm.get`;
+			console.error(msg);
+			throw new WNPMError(msg, npmResults);
+		}
+
+		const packageIndex = forcePackage - 1 || 0;
+		const npmPackage = npmResults.objects[packageIndex].package;
+		console.log(`Found ${query} as ${npmPackage.name} at ${npmPackage.version}; using ${npmPackage.links.repository}`);
+
+		let baseUrl, providerFound = false;
+		for (let provider of cdnProviders) {
 			try {
-				npmResults = await search(query, npmFilters);
+				baseUrl = await getCdnUrl(npmPackage, provider);
+				providerFound = true;
+				break;
 			} catch(e) {
-				const msg = 'Error searching NPM registry.';
-				console.error(msg);
-				reject({msg, details: e});
-				return;
+				console.warn(`Could not generate a CDN URL for ${provider}`);
 			}
+		}
 
-			if (npmResults.total === 0) {
-				const msg = `No results found for ${query}.`;
-				console.error(msg);
-				reject({msg, details: npmResults});
-				return;
+		if (!providerFound) {
+			const msg = `Couldn't generate a CDN URL for any provider`;
+			console.error(msg);
+			throw new WNPMError(msg, npmPackage);
+		}
+
+		let mainFile, mainFileName;
+		try {
+			const packageJSON = await jsonFetch(`${baseUrl}/package.json`);
+			console.log(`package.json retrieved`);
+			if (packageJSON.dependencies instanceof Array && packageJSON.dependencies.length > 0) {
+				console.log(`This package appears to have dependencies. You may have issues running this package.`);
 			}
-
-			if (parseInt(npmResults.results[0].searchScore) < 100 && !forcePackage) {
-				const msg = `Couldn't find an exact match for ${query}.\n\n` +
-				`Use wnpm.search to determine the correct package name or use the 'forcePackage' option with wnpm.get`;
-				console.error(msg);
-				reject({msg, details: npmResults});
-				return;
+			if ('unpkg' in packageJSON && typeof packageJSON.unpkg === 'string') {
+				mainFileName = 'unpkg';
+			} else if ('browser' in packageJSON && typeof packageJSON.browser === 'string') {
+				mainFileName = 'browser';
+			} else {
+				mainFileName = 'main';
 			}
+			mainFile = filePath || packageJSON[mainFileName] || 'index.js';
+			console.log(`Loading package ${mainFileName} file: ${mainFile}`);
+		} catch(e) {
+			const msg = `Error retrieving package.json for ${npmPackage.name}. Status: ${e.status}`;
+			console.error(msg);
+			throw new WNPMError(msg, e);
+		}
 
-			const packageIndex = forcePackage - 1 || 0;
-			const npmPackage = npmResults.results[packageIndex].package;
-			console.log(`Found ${query} as ${npmPackage.name} at ${npmPackage.version}; using ${npmPackage.links.repository}`);
-
-			let baseUrl, providerFound = false;
-			for (let provider of cdnProviders) {
-				try {
-					baseUrl = await getCdnUrl(npmPackage, provider);
-					providerFound = true;
-					break;
-				} catch(e) {
-					console.warn(`Could not generate a CDN URL for ${provider}`);
-				}
-			}
-
-			if (!providerFound) {
-				const msg = `Couldn't generate a CDN URL for any provider`;
-				console.error(msg);
-				reject({msg, details: npmPackage});
-				return;
-			}
-
-			let mainFile, mainFileName;
-			try {
-				const packageJSON = await jsonFetch(`${baseUrl}/package.json`);
-				console.log(`package.json retrieved`);
-				if (packageJSON.dependencies instanceof Array && packageJSON.dependencies.length > 0) {
-					console.log(`This package appears to have dependencies. You may have issues running this package.`);
-				}
-				if ('unpkg' in packageJSON && typeof packageJSON.unpkg === 'string') {
-					mainFileName = 'unpkg';
-				} else if ('browser' in packageJSON && typeof packageJSON.browser === 'string') {
-					mainFileName = 'browser';
-				} else {
-					mainFileName = 'main';
-				}
-				mainFile = filePath || packageJSON[mainFileName] || 'index.js';
-				console.log(`Loading package ${mainFileName} file: ${mainFile}`);
-			} catch(e) {
-				const msg = `Error retrieving package.json for ${npmPackage.name}. Status: ${e.status}`;
-				console.error(msg);
-				reject({msg, details: e});
-			}
-
-			try {
-				await WNPM.load(`${baseUrl}/${mainFile}`);
-				console.log(`${npmPackage.name} loaded!`);
-				resolve(npmPackage);
-			} catch (e) {
-				const msg = 'An error occurred loading the script.';
-				console.error(msg);
-				reject({msg, details: e});
-			}
-		});
+		try {
+			await WNPM.load(`${baseUrl}/${mainFile}`);
+			console.log(`${npmPackage.name} loaded!`);
+			return npmPackage;
+		} catch (e) {
+			const msg = 'An error occurred loading the script.';
+			console.error(msg);
+			throw new WNPMError(msg, e);
+		}
 	}
 
 	static getAll(queries, opts) {
@@ -173,34 +178,32 @@ class WNPM {
 		});
 	}
 
-	static search(query = '', filters = {}) {
-		return new Promise(async (resolve, reject) => {
-			let json;
-			try {
-				json = await search(query, filters);
-			} catch(e) {
-				const msg = 'Error searching NPM registry';
-				console.error(msg);
-				reject({msg, details: e});
-				return;
+	static async search(query = '', filters = {}) {
+		let json;
+		try {
+			json = await search(query, filters);
+		} catch(e) {
+			const msg = 'Error searching NPM registry';
+			console.error(msg);
+			throw new WNPMError(msg, e);
+			return;
+		}
+
+		console.groupCollapsed(`${json.total} found for ${query}`);
+		json.objects.forEach((result, index) => {
+			console.groupCollapsed(`${index + 1}. ${result.package.name}`);
+			console.log(`Result score: ${parseInt(result.score.final * 100)}%`);
+			console.log(result.package.description);
+			if (result.searchScore < 100) {
+				console.log('%cThis package would not be selected automatically with wnpm.get', 'color: red');
+			} else {
+				console.log('%cThis package could be selected automatically with wnpm.get', 'color: green');
 			}
-
-			console.groupCollapsed(`${json.total} found for ${query}`);
-			json.results.forEach((result, index) => {
-				console.groupCollapsed(`${index + 1}. ${result.package.name}`);
-				console.log(`Result score: ${parseInt(result.score.final * 100)}%`);
-				console.log(result.package.description);
-				if (result.searchScore < 100) {
-					console.log('%cThis package would not be selected automatically with wnpm.get', 'color: red');
-				} else {
-					console.log('%cThis package could be selected automatically with wnpm.get', 'color: green');
-				}
-				console.groupEnd();
-			});
 			console.groupEnd();
-
-			resolve(json);
 		});
+		console.groupEnd();
+
+		return json;
 	}
 }
 

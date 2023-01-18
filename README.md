@@ -61,7 +61,7 @@ Load multiple NPM packages into the browser. Returns a Promise of each call to `
 
 - `queries`: An array of  NPM package names.
 - `opts`: An object of options that will be used by both package loads.
-	- `npmFilters`: An object of filters as specified by the [NPMS API](https://api-docs.npms.io/#api-Search-ExecuteSearchQuery)
+	- `npmFilters`: An object of filters as specified by the [NPM registry search API](https://github.com/npm/registry/blob/master/docs/REGISTRY-API.md#get-v1search)
 		- Default: `{not: ['deprecated','insecure','unstable']}`
 	- `forcePackage`: An integer corresponding to the package order returned when using `wnpm.search` with the same `query`.
 	- `cdnProviders`: An order of CDN providers that should be used to retrieve files.
